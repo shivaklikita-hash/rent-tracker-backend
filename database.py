@@ -7,6 +7,9 @@ DATABASE_URL = os.getenv('DATABASE_URL')
 if not DATABASE_URL:
     raise Exception('DATABASE_URL environment variable is required')
 
+if "sslmode" not in DATABASE_URL:
+    DATABASE_URL += "?sslmode=require"
+
 database = databases.Database(DATABASE_URL)
 metadata = MetaData()
 
