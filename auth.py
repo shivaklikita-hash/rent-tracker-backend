@@ -1,16 +1,25 @@
+# auth.py
+import os
+import uuid
+import logging
+from datetime import datetime, timedelta
+
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
 from passlib.context import CryptContext
 from jose import jwt
-from datetime import datetime, timedelta
-import os
-import uuid
+
 from database import database, users
-from fastapi.security import OAuth2PasswordRequestForm
+
+# simple logger
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("auth")
 
 router = APIRouter()
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Use pbkdf2_sha256 which does not require native bcrypt bindings
+pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
 SECRET_KEY = os.getenv("SECRET_KEY", "change-this")
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
@@ -25,46 +34,61 @@ class RegisterRequest(BaseModel):
 
 @router.post("/register")
 async def register(req: RegisterRequest):
-    # Check if email exists
-    q = users.select().where(users.c.email == req.email)
-    existing = await database.fetch_one(q)
-    if existing:
-        raise HTTPException(status_code=400, detail="Email already registered")
+    try:
+        # Check if email exists
+        q = users.select().where(users.c.email == req.email)
+        existing = await database.fetch_one(q)
+        if existing:
+            raise HTTPException(status_code=400, detail="Email already registered")
 
-    # Hash password (bcrypt max 72 bytes)
-    pw = pwd_context.hash(req.password[:70])
-    uid = str(uuid.uuid4())
+        # Hash password with pbkdf2_sha256 (no 72-byte limit)
+        pw_hash = pwd_context.hash(req.password)
 
-    await database.execute(
-        users.insert().values(
-            id=uid,
-            name=req.name,
-            email=req.email,
-            password_hash=pw,
-            created_at=datetime.utcnow()
+        uid = str(uuid.uuid4())
+
+        await database.execute(
+            users.insert().values(
+                id=uid,
+                name=req.name,
+                email=req.email,
+                password_hash=pw_hash,
+                created_at=datetime.utcnow(),
+            )
         )
-    )
 
-    return {"status": "ok", "message": "User registered successfully"}
+        logger.info("Registered user %s", req.email)
+        return {"status": "ok", "message": "User registered successfully"}
+    except HTTPException:
+        # re-raise HTTPExceptions so FastAPI handles them as-is
+        raise
+    except Exception as e:
+        logger.exception("Failed to register user")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/token")
 async def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    q = users.select().where(users.c.email == form_data.username)
-    user = await database.fetch_one(q)
+    try:
+        q = users.select().where(users.c.email == form_data.username)
+        user = await database.fetch_one(q)
 
-    if not user:
-        raise HTTPException(status_code=401, detail="Invalid email or password")
+        if not user:
+            raise HTTPException(status_code=401, detail="Invalid email or password")
 
-    if not pwd_context.verify(form_data.password, user["password_hash"]):
-        raise HTTPException(status_code=401, detail="Invalid email or password")
+        if not pwd_context.verify(form_data.password, user["password_hash"]):
+            raise HTTPException(status_code=401, detail="Invalid email or password")
 
-    expire = datetime.utcnow() + timedelta(minutes=ACCESS_EXPIRE_MINUTES)
+        expire = datetime.utcnow() + timedelta(minutes=ACCESS_EXPIRE_MINUTES)
 
-    token = jwt.encode(
-        {"sub": user["id"], "exp": expire},
-        SECRET_KEY,
-        algorithm=ALGORITHM,
-    )
+        token = jwt.encode(
+            {"sub": user["id"], "exp": expire},
+            SECRET_KEY,
+            algorithm=ALGORITHM,
+        )
 
-    return {"access_token": token, "token_type": "bearer"}
+        return {"access_token": token, "token_type": "bearer"}
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Login failure")
+        raise HTTPException(status_code=500, detail="Internal server error")
