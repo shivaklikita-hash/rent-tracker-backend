@@ -83,7 +83,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
 
         sub = str(user["id"])         # ensure UUID (or any non-serializable) becomes JSON string
         token = jwt.encode(
-            {"sub": user["id"], "exp": expire_ts},
+            {"sub": sub, "exp": expire_ts},
             SECRET_KEY,
             algorithm=ALGORITHM,
         )
