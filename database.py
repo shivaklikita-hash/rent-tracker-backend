@@ -10,7 +10,11 @@ if not DATABASE_URL:
 if "sslmode" not in DATABASE_URL:
     DATABASE_URL += "?sslmode=require"
 
-database = databases.Database(DATABASE_URL)
+database = databases.Database(
+    DATABASE_URL,
+    min_size=1,
+    max_size=1   # VERY IMPORTANT for Supabase free tier
+)
 metadata = MetaData()
 
 users = Table(
