@@ -79,7 +79,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
             raise HTTPException(status_code=401, detail="Invalid email or password")
 
         expire = datetime.utcnow() + timedelta(minutes=ACCESS_EXPIRE_MINUTES)
-        expire_ts = int(expire_dt.timestamp())
+        expire_ts = int(expire.timestamp())
 
         sub = str(user["id"])         # ensure UUID (or any non-serializable) becomes JSON string
         token = jwt.encode(
