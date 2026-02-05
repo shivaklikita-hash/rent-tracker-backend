@@ -24,14 +24,17 @@ app.include_router(payments.router, prefix='/payments', tags=['payments'])
 async def startup():
     try:
         await database.connect()
-    except Exception:
-        await database.disconnect()
-        await database.connect()
+        print("✅ DB connected")
+    except Exception as e:
+        print("⚠️ DB connection failed — starting without DB:", e)
 
-
-@app.on_event('shutdown')
+@app.on_event("shutdown")
 async def shutdown():
-    await database.disconnect()
+    try:
+        await database.disconnect()
+    except Exception:
+        pass
+
 
 @app.get('/')
 async def root():
