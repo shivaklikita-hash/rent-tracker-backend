@@ -1,21 +1,32 @@
 import os
 import databases
 import sqlalchemy
+from urllib.parse import urlparse
 from sqlalchemy import Table, Column, String, Integer, Numeric, Text, TIMESTAMP, ForeignKey, MetaData
 
-DATABASE_URL = os.getenv('DATABASE_URL')
+DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
-    raise Exception('DATABASE_URL environment variable is required')
+    raise Exception("DATABASE_URL environment variable is required")
 
-if "sslmode" not in DATABASE_URL:
-    DATABASE_URL += "?sslmode=require"
+# --- SAFE PARAM MERGE (prevents double ?? bug) ---
+def ensure_param(url: str, param: str):
+    if param.split("=")[0] in url:
+        return url
+    sep = "&" if "?" in url else "?"
+    return url + sep + param
 
+DATABASE_URL = ensure_param(DATABASE_URL, "sslmode=require")
+DATABASE_URL = ensure_param(DATABASE_URL, "command_timeout=30")
+
+# --- Supabase pooler friendly config ---
 database = databases.Database(
     DATABASE_URL,
     min_size=1,
-    max_size=1   # VERY IMPORTANT for Supabase free tier
+    max_size=1,
 )
+
 metadata = MetaData()
+
 
 users = Table(
     'users', metadata,
