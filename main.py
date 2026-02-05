@@ -20,9 +20,14 @@ app.include_router(floors.router, prefix='/floors', tags=['floors'])
 app.include_router(rooms.router, prefix='/rooms', tags=['rooms'])
 app.include_router(payments.router, prefix='/payments', tags=['payments'])
 
-@app.on_event('startup')
+@app.on_event("startup")
 async def startup():
-    await database.connect()
+    try:
+        await database.connect()
+    except Exception:
+        await database.disconnect()
+        await database.connect()
+
 
 @app.on_event('shutdown')
 async def shutdown():
