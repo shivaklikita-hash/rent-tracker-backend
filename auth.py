@@ -73,9 +73,9 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
         try:
             user = await database.fetch_one(q)
         except Exception:
-        await database.disconnect()
-        await database.connect()
-        user = await database.fetch_one(q)
+            await database.disconnect()
+            await database.connect()
+            user = await database.fetch_one(q)
 
 
         if not user:
