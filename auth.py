@@ -52,7 +52,6 @@ async def register(req: RegisterRequest):
                 name=req.name,
                 email=req.email,
                 password_hash=pw_hash,
-                created_at=datetime.utcnow(),
             )
         )
 
