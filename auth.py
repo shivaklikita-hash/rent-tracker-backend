@@ -70,7 +70,13 @@ async def register(req: RegisterRequest):
 async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     try:
         q = users.select().where(users.c.email == form_data.username)
+        try:
+            user = await database.fetch_one(q)
+        except Exception:
+        await database.disconnect()
+        await database.connect()
         user = await database.fetch_one(q)
+
 
         if not user:
             raise HTTPException(status_code=401, detail="Invalid email or password")
